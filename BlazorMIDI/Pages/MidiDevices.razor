@@ -1,0 +1,202 @@
+﻿@page "/"
+@using System.Threading
+@using Microsoft.JSInterop;
+@using System;
+@using System.Text.Json.Serialization
+@using System.Threading.Tasks;
+@inject IJSRuntime JSRuntime;
+
+<h3>MidiDevices</h3>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th class="leftHeader">Actions</th>
+            <th class="rightHeader">Results</th>
+        </tr>
+    </thead>
+    <tr>
+        <td class="leftCol">
+            <button id="initializeButton" @onclick="InitializeMidi">Initialise MIDI</button>
+        </td>
+        <td class="rightCol">
+            <label id="statusLabel">@status</label>
+        </td>
+    </tr>
+    <tr>
+        <td class="leftCol">
+            <button id="listInputsButton" @onclick="ListInputPorts">List Input Ports</button>
+        </td>
+        <td class="rightCol">
+            <label id="inputDevices">@inputDeviceSummary</label>
+        </td>
+    </tr>
+    <tr>
+        <td class="leftCol">
+            <button id="listOutputsButton" @onclick="ListOutputPorts">List Output Ports</button>
+        </td>
+        <td class="rightCol">
+            <label id="outputDevices">@outputDeviceSummary</label>
+        </td>
+    </tr>
+    <tr>
+        <td class="leftCol">
+            Inputs:
+        </td>
+        <td class="rightCol">
+            <select>
+                @if (inputDeviceList != null)
+                {
+                    @foreach (var device in inputDeviceList)
+                    {
+                        <option id="@device.Id">@device.Name</option>
+                    }
+                }
+            </select>
+        </td>
+    </tr>
+    <tr>
+        <td class="leftCol">
+            Outputs:
+        </td>
+        <td class="rightCol">
+            <select>
+                @if (outputDeviceList != null)
+                {
+                    @foreach (var device in outputDeviceList)
+                    {
+                        <option id="@device.Id">@device.Name</option>
+                    }
+                }
+            </select>
+        </td>
+    </tr>
+</table>
+
+@functions
+{
+    public class PromiseHandler : IDisposable
+    {
+        public DotNetObjectReference<PromiseHandler> Proxy { get; }
+        private readonly TaskCompletionSource<int> tcs;
+
+        public PromiseHandler()
+        {
+            Proxy = DotNetObjectReference.Create(this);
+            tcs = new TaskCompletionSource<int>();
+        }
+
+        [JSInvokable]
+        public void Success() =>
+            tcs.TrySetResult(0);
+
+        [JSInvokable]
+        public void Failure(string message) =>
+            tcs.TrySetException(new Exception(message));
+
+        public Task Task => tcs.Task;
+
+        public void Dispose() => Proxy.Dispose();
+    }
+
+    public class MidiMessageHandler : IDisposable
+    {
+        public DotNetObjectReference<MidiMessageHandler> Proxy { get; }
+        private readonly Action<MidiMessage> handler;
+
+        public MidiMessageHandler(Action<MidiMessage> handler)
+        {
+            Proxy = DotNetObjectReference.Create(this);
+            this.handler = handler;
+        }
+
+        [JSInvokable]
+        public void OnMessageReceived(MidiMessage message) => handler(message);
+
+        public void Dispose() => Proxy.Dispose();
+    }
+}
+
+@code
+{
+    public class MidiPort
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; }
+
+        [JsonPropertyName("name")]
+        public string Name { get; set; }
+
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+
+        [JsonPropertyName("manufacturer")]
+        public string Manufacturer { get; set; }
+
+        [JsonPropertyName("version")]
+        public string Version { get; set; }
+    }
+
+    public class MidiMessage
+    {
+        public byte[] Data { get; set; }
+    }
+
+    //private async Task InitializeMidi()
+    //{
+    //    var result = await JSRuntime.InvokeAsync<object>("midi.initialize", Timeout);
+
+    //    await Task.Delay(3000);
+    //    status = await JSRuntime.InvokeAsync<string>("midi.getStatus");
+
+    //}
+    private async Task InitializeMidi()
+    {
+        var handler = new PromiseHandler();
+        await JSRuntime.InvokeAsync<object>("midi.initialize", Timeout, handler.Proxy);
+        try
+        {
+            await handler.Task;
+            status = "Initialized";
+
+            //var messageHandler = new MidiMessageHandler(MessageReceived);
+            //await JSRuntime.InvokeVoidAsync("midi.addMessageHandler", Timeout, inputs[0].Id, messageHandler.Proxy);
+
+        }
+        catch (Exception e)
+        {
+            status = $"Initialization failed: {e.Message}";
+        }
+
+    }
+
+    // Separate method for the callback - we could have used a local
+    // method or lambda though.
+    private void MessageReceived(MidiMessage message)
+    {
+        messages.Add(BitConverter.ToString(message.Data));
+        // Blazor doesn't "know" that the collection has changed - even if we make it an ObservableCollection
+        StateHasChanged();
+    }
+
+    private async Task ListInputPorts()
+    {
+        inputDeviceList = await JSRuntime.InvokeAsync<List<MidiPort>>("midi.getInputPorts", Timeout);
+        inputDeviceSummary = inputDeviceList.Count > 0 ? string.Join(", ", inputDeviceList.Select(input => $"Input type:{input.Type} | id:{input.Id} | manufacturer:{input.Manufacturer} | name:{input.Name} | version:{input.Version}")) : "No input device ports found";
+    }
+
+    private async Task ListOutputPorts()
+    {
+        outputDeviceList = await JSRuntime.InvokeAsync<List<MidiPort>>("midi.getOutputPorts", Timeout);
+        outputDeviceSummary = outputDeviceList.Count > 0 ? string.Join(", ", outputDeviceList.Select(output => $"Output type:{output.Type} | id:{output.Id} | manufacturer:{output.Manufacturer} | name:{output.Name} | version:{output.Version}")) : "No output device ports found";
+    }
+
+    private string status;
+    private readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
+    private string inputDeviceSummary;
+    private string outputDeviceSummary;
+    private readonly List<string> messages = new List<string>();
+    private List<MidiPort> inputDeviceList = new List<MidiPort>();
+    private List<MidiPort> outputDeviceList = new List<MidiPort>();
+}
+

@@ -1,0 +1,32 @@
+﻿
+td.leftCol {
+    width: 20%;
+    background: lightblue;
+    border: solid darkslategrey;
+    text-align: right;
+}
+
+td.rightCol {
+    width: 80%;
+    background: lightcyan;
+    border: solid darkslategrey;
+    text-align: left;
+}
+
+th.leftHeader {
+    width: 20%;
+    background: darkcyan;
+    color: azure;
+    border: solid darkslategrey;
+    text-align: right;
+    font-weight: bold;
+}
+
+th.rightHeader {
+    width: 80%;
+    background: darkcyan;
+    color: azure;
+    border: solid darkslategrey;
+    text-align: left;
+    font-weight: bold;
+}
