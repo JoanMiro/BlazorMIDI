@@ -41,10 +41,10 @@
     </tr>
     <tr>
         <td class="leftCol">
-            Inputs:
+            <button @onclick="ListenToPort">Listen</button>
         </td>
         <td class="rightCol">
-            <select>
+            <select @bind="selectedInput">
                 @if (inputDeviceList != null)
                 {
                     @foreach (var device in inputDeviceList)
@@ -53,6 +53,7 @@
                     }
                 }
             </select>
+            <label id="selectedInputLabel">@selectedInput</label>
         </td>
     </tr>
     <tr>
@@ -60,7 +61,7 @@
             Outputs:
         </td>
         <td class="rightCol">
-            <select>
+            <select id="outputDeviceSelect">
                 @if (outputDeviceList != null)
                 {
                     @foreach (var device in outputDeviceList)
@@ -142,14 +143,6 @@
         public byte[] Data { get; set; }
     }
 
-    //private async Task InitializeMidi()
-    //{
-    //    var result = await JSRuntime.InvokeAsync<object>("midi.initialize", Timeout);
-
-    //    await Task.Delay(3000);
-    //    status = await JSRuntime.InvokeAsync<string>("midi.getStatus");
-
-    //}
     private async Task InitializeMidi()
     {
         var handler = new PromiseHandler();
@@ -191,6 +184,11 @@
         outputDeviceSummary = outputDeviceList.Count > 0 ? string.Join(", ", outputDeviceList.Select(output => $"Output type:{output.Type} | id:{output.Id} | manufacturer:{output.Manufacturer} | name:{output.Name} | version:{output.Version}")) : "No output device ports found";
     }
 
+    private void ListenToPort()
+    {
+        Console.WriteLine(selectedInput);
+    }
+
     private string status;
     private readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
     private string inputDeviceSummary;
@@ -198,5 +196,6 @@
     private readonly List<string> messages = new List<string>();
     private List<MidiPort> inputDeviceList = new List<MidiPort>();
     private List<MidiPort> outputDeviceList = new List<MidiPort>();
+    private string selectedInput;
 }
 
